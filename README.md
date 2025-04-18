@@ -235,8 +235,25 @@ postie configure \
 
 ### Send an Email
 
+The `postie send` command automatically reads default options from `.postierc` if it exists in your project root. You can override any of these options using command-line arguments.
+
+Example `.postierc` file:
+```json
+{
+  "from": "noreply@example.com",
+  "fromName": "Example Team",
+  "subject": "Default Subject",
+  "to": "team@example.com",
+  "toName": "Team Members",
+  "attachments": ["report.pdf"]
+}
+```
+
 ```bash
-# Basic email
+# Basic email (uses defaults from .postierc)
+postie send --text "This is a test email"
+
+# Override defaults from .postierc
 postie send \
   --from sender@example.com \
   --from-name "John Doe" \

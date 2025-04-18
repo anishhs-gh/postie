@@ -1,6 +1,6 @@
 {
   "name": "@anishhs/postie",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A simple and powerful email sending library for Node.js with CLI support",
   "main": "src/index.js",
   "bin": {
