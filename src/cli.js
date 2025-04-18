@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
 const { program } = require('commander')
-const postie = require('./index')
+const Postie = require('./index')
 const fs = require('fs')
 const path = require('path')
+
+// Create a new Postie instance
+const postie = new Postie()
 
 // Configuration file path
 const CONFIG_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.postie', 'config.json')

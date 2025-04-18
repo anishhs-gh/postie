@@ -1,10 +1,12 @@
-const postie = require('../src')
+const Postie = require('../src')
 const nodemailer = require('nodemailer')
 
 // Mock nodemailer
 jest.mock('nodemailer')
 
 describe('Postie', () => {
+  let postie
+
   beforeEach(() => {
     // Reset mocks before each test
     jest.clearAllMocks()
@@ -12,14 +14,8 @@ describe('Postie', () => {
       sendMail: jest.fn().mockResolvedValue({ messageId: 'test-message-id' })
     })
 
-    // Reset postie instance
-    postie.transporter = null;
-    postie.config = {
-      devMode: false,
-      retryAttempts: 3,
-      retryDelay: 1000
-    }
-    postie.middleware = [];
+    // Create a new instance for each test
+    postie = new Postie()
   })
 
   describe('configure', () => {
@@ -129,6 +125,13 @@ describe('Postie', () => {
     })
 
     it('should retry on failure', async () => {
+      const mockSendMail = jest.fn()
+        .mockRejectedValueOnce(new Error('First attempt failed'))
+        .mockRejectedValueOnce(new Error('Second attempt failed'))
+        .mockResolvedValueOnce({ messageId: 'test-message-id' })
+
+      nodemailer.createTransport.mockReturnValue({ sendMail: mockSendMail })
+
       postie.setTransporter({
         host: 'test-host',
         port: 1234,
@@ -138,13 +141,6 @@ describe('Postie', () => {
           pass: 'test-pass'
         }
       })
-
-      const mockSendMail = jest.fn()
-        .mockRejectedValueOnce(new Error('First attempt failed'))
-        .mockRejectedValueOnce(new Error('Second attempt failed'))
-        .mockResolvedValueOnce({ messageId: 'test-message-id' })
-
-      nodemailer.createTransport.mockReturnValue({ sendMail: mockSendMail })
 
       postie.configure({ retryAttempts: 3, retryDelay: 0 })
 
