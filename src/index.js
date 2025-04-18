@@ -111,6 +111,18 @@ class Postie {
       attachments: options.attachments,
     }
 
+    // Execute middleware chain
+    let middlewareIndex = 0;
+    const next = async () => {
+      if (middlewareIndex < this.middleware.length) {
+        const middleware = this.middleware[middlewareIndex++];
+        await middleware(email, next);
+      }
+    };
+
+    // Start middleware chain
+    await next();
+
     let attempts = 0
     let lastError = null
 

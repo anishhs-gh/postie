@@ -3,7 +3,7 @@ name: Publish to npm
 on:
   push:
     branches:
-      - fix/npm-deploy-issue
+      - master
 
 jobs:
   publish:

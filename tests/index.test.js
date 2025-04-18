@@ -180,4 +180,137 @@ describe('Postie', () => {
       await expect(postie.sendTemplate(emailOptions)).rejects.toThrow('Template path is required')
     })
   })
+
+  describe('middleware', () => {
+    beforeEach(() => {
+      postie = new Postie()
+      postie.setTransporter({
+        host: 'test-host',
+        port: 1234,
+        secure: true,
+        auth: {
+          user: 'test-user',
+          pass: 'test-pass'
+        }
+      })
+    })
+
+    it('should execute middleware in order', async () => {
+      const executionOrder = []
+      
+      postie.use((email, next) => {
+        executionOrder.push(1)
+        next()
+      })
+      
+      postie.use((email, next) => {
+        executionOrder.push(2)
+        next()
+      })
+      
+      postie.use((email, next) => {
+        executionOrder.push(3)
+        next()
+      })
+
+      await postie.send({
+        from: 'sender@example.com',
+        to: 'recipient@example.com',
+        subject: 'Test Subject',
+        text: 'Test Message'
+      })
+
+      expect(executionOrder).toEqual([1, 2, 3])
+    })
+
+    it('should allow middleware to modify email options', async () => {
+      postie.use((email, next) => {
+        email.subject = 'Modified Subject'
+        next()
+      })
+
+      postie.use((email, next) => {
+        email.headers = {
+          'X-Custom-Header': 'value'
+        }
+        next()
+      })
+
+      const emailOptions = {
+        from: 'sender@example.com',
+        to: 'recipient@example.com',
+        subject: 'Original Subject',
+        text: 'Test Message'
+      }
+
+      await postie.send(emailOptions)
+
+      expect(nodemailer.createTransport().sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: 'Modified Subject',
+          headers: {
+            'X-Custom-Header': 'value'
+          }
+        })
+      )
+    })
+
+    it('should handle async middleware', async () => {
+      postie.use(async (email, next) => {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        email.subject = 'Async Modified'
+        next()
+      })
+
+      const emailOptions = {
+        from: 'sender@example.com',
+        to: 'recipient@example.com',
+        subject: 'Original Subject',
+        text: 'Test Message'
+      }
+
+      await postie.send(emailOptions)
+
+      expect(nodemailer.createTransport().sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: 'Async Modified'
+        })
+      )
+    })
+
+    it('should handle middleware errors', async () => {
+      postie.use((email, next) => {
+        throw new Error('Middleware error')
+      })
+
+      const emailOptions = {
+        from: 'sender@example.com',
+        to: 'recipient@example.com',
+        subject: 'Test Subject',
+        text: 'Test Message'
+      }
+
+      await expect(postie.send(emailOptions)).rejects.toThrow('Middleware error')
+    })
+
+    it('should not execute middleware in dev mode', async () => {
+      postie.configure({ devMode: true })
+      
+      let middlewareExecuted = false
+      postie.use((email, next) => {
+        middlewareExecuted = true
+        next()
+      })
+
+      const emailOptions = {
+        from: 'sender@example.com',
+        to: 'recipient@example.com',
+        subject: 'Test Subject',
+        text: 'Test Message'
+      }
+
+      await postie.send(emailOptions)
+      expect(middlewareExecuted).toBe(false)
+    })
+  })
 }) 
