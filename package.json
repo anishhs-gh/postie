@@ -1,0 +1,45 @@
+{
+  "name": "@anishhs/postie",
+  "version": "1.0.0",
+  "description": "A simple and powerful email sending library for Node.js with CLI support",
+  "main": "src/index.js",
+  "bin": {
+    "postie": "src/cli.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint src/ tests/",
+    "example": "node examples/basic.js"
+  },
+  "keywords": [
+    "email",
+    "smtp",
+    "nodemailer",
+    "cli",
+    "template",
+    "notification",
+    "command-line"
+  ],
+  "author": "Anish Shekh",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.1.0",
+    "handlebars": "^4.7.8",
+    "nodemailer": "^6.9.9"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ]
+}

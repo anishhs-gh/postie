@@ -1,0 +1,36 @@
+# Tests
+tests/
+coverage/
+
+# Examples
+examples/
+
+# Development
+.git/
+.gitignore
+.npmignore
+jest.config.js
+.eslintrc.js
+
+# Environment
+.env
+.env.*
+.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!README.md
+!LICENSE 
+
+# Postie
+.postierc
