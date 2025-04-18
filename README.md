@@ -1,6 +1,6 @@
 # Postie
 
-A simple and powerful email sending library for Node.js with support for templates, attachments, and a CLI interface.
+A simple and flexible email sending library for Node.js with support for templates, retries, and more.
 
 ## Author
 
@@ -12,16 +12,15 @@ A simple and powerful email sending library for Node.js with support for templat
 ## Features
 
 - Simple and intuitive API
-- Support for plain text and HTML emails
-- Flexible template engine support (Handlebars, EJS, etc.)
-- Named email addresses
-- File attachments
-- Multiple recipients (to, cc, bcc)
-- Retry mechanism for failed sends
+- Support for multiple template engines (Handlebars, EJS, etc.)
+- Automatic retry on failure
 - Development mode for testing
-- CLI interface
-- Middleware support
-- Configurable logging
+- Named email addresses (e.g., "John Doe <john@example.com>")
+- Support for JSON files for recipients and HTML content
+- Flexible configuration options
+- CLI tool for easy email sending
+- Middleware support for custom email processing
+- Project-specific configuration via `.postierc` file
 
 ## Installation
 
@@ -34,6 +33,14 @@ npm install @anishhs/postie
 ```
 
 ## Configuration
+
+Postie supports multiple configuration methods:
+
+1. Global configuration in `~/.postie/config.json`
+2. Project-specific configuration in `.postierc`
+3. Runtime configuration via API
+
+### Global Configuration
 
 Postie stores its configuration in `~/.postie/config.json`. This file contains your SMTP settings and other configuration options. The file is automatically created when you run the configure command.
 
@@ -57,6 +64,24 @@ Example configuration file:
 }
 ```
 
+### Project Configuration (.postierc)
+
+You can create a `.postierc` file in your project root to specify default options for that project. This is useful when you have project-specific email settings.
+
+Example `.postierc` file:
+```json
+{
+  "from": "project@example.com",
+  "fromName": "Project Name",
+  "subject": "Default Subject",
+  "to": "team@example.com"
+}
+```
+
+The CLI will automatically use these options when sending emails, but you can override them with command-line arguments.
+
+### Runtime Configuration
+
 You can configure Postie using the CLI:
 
 ```bash
@@ -71,162 +96,147 @@ postie configure \
   --retry-delay 1000
 ```
 
+## Middleware Support
+
+Postie supports middleware functions that can modify email options before sending. This is useful for adding custom headers, logging, or modifying content.
+
+```javascript
+// Add a middleware function
+postie.use((emailOptions, next) => {
+  // Add a custom header
+  emailOptions.headers = {
+    ...emailOptions.headers,
+    'X-Custom-Header': 'value'
+  }
+  
+  // Log the email
+  console.log('Sending email:', emailOptions)
+  
+  // Call next to continue processing
+  next()
+})
+
+// Send an email (middleware will be called)
+await postie.send({
+  from: 'sender@example.com',
+  to: 'recipient@example.com',
+  subject: 'Hello',
+  text: 'This is a test email'
+})
+```
+
+You can add multiple middleware functions, and they will be called in the order they were added.
+
 ## Quick Start
 
 1. Configure Postie with your SMTP settings:
 
 ```javascript
-const postie = require('postie')
+const Postie = require('postie')
+const postie = new Postie()
 
-// Configure Postie
-postie.configure({
-  devMode: false, // Set to true for testing
-  retryAttempts: 3,
-  retryDelay: 1000
-})
-
-// Set up SMTP transporter
+// Configure SMTP
 postie.setTransporter({
-  host: 'smtp.example.com',
+  host: 'smtp.gmail.com',
   port: 587,
-  secure: false,
+  secure: false, // Use STARTTLS
   auth: {
-    user: 'your-email@example.com',
-    pass: 'your-password'
+    user: 'your-email@gmail.com',
+    pass: 'your-app-password'
   }
 })
 
-// Send a simple email
+// Send a basic email
 await postie.send({
   from: 'sender@example.com',
   fromName: 'John Doe', // Optional sender name
   to: 'recipient@example.com',
   toName: 'Jane Smith', // Optional recipient name
-  subject: 'Hello!',
-  text: 'This is a test email.'
-})
-```
-
-## Basic Usage
-
-### Sending Emails
-
-```javascript
-// Send a plain text email with named addresses
-await postie.send({
-  from: 'sender@example.com',
-  fromName: 'John Doe',
-  to: 'recipient@example.com',
-  toName: 'Jane Smith',
-  subject: 'Hello!',
-  text: 'This is a test email.'
+  subject: 'Hello',
+  text: 'This is a test email'
 })
 
-// Send to multiple recipients with names
+// Send to multiple recipients
 await postie.send({
   from: 'sender@example.com',
-  fromName: 'John Doe',
   to: [
-    { email: 'recipient1@example.com', name: 'Jane Smith' },
-    { email: 'recipient2@example.com', name: 'Bob Johnson' }
+    'recipient1@example.com',
+    { email: 'recipient2@example.com', name: 'Recipient 2' }
   ],
-  cc: { email: 'cc@example.com', name: 'CC Person' },
-  bcc: [
-    { email: 'bcc1@example.com', name: 'BCC Person 1' },
-    { email: 'bcc2@example.com', name: 'BCC Person 2' }
-  ],
-  subject: 'Multiple Recipients',
-  text: 'This email has multiple recipients.'
+  subject: 'Hello',
+  text: 'This is a test email'
+})
+
+// Send with HTML content
+await postie.send({
+  from: 'sender@example.com',
+  to: 'recipient@example.com',
+  subject: 'Hello',
+  html: '<h1>Hello</h1><p>This is a test email</p>'
+})
+
+// Send with attachments
+await postie.send({
+  from: 'sender@example.com',
+  to: 'recipient@example.com',
+  subject: 'Hello',
+  text: 'This is a test email',
+  attachments: [
+    {
+      filename: 'document.pdf',
+      path: '/path/to/document.pdf'
+    }
+  ]
 })
 ```
 
-### Using Templates
-
-Postie supports any template engine that provides a `compile` method. Here are examples using different engines:
+## Template Usage
 
 ```javascript
-// Using Handlebars
 const Handlebars = require('handlebars')
 postie.setTemplateEngine(Handlebars)
-
-// Using EJS
-const ejs = require('ejs')
-postie.setTemplateEngine({
-  compile: (template) => (data) => ejs.render(template, data)
-})
-
-// Using custom template engine
-postie.setTemplateEngine({
-  compile: (template) => (data) => {
-    // Your custom template compilation logic
-    return template.replace(/\{\{(\w+)\}\}/g, (match, key) => data[key] || '')
-  }
-})
 
 // Send a template email
 await postie.sendTemplate({
   from: 'sender@example.com',
-  fromName: 'John Doe',
   to: 'recipient@example.com',
-  toName: 'Jane Smith',
-  subject: 'Welcome Email',
+  subject: 'Hello',
   template: './templates/welcome.hbs',
   data: {
-    name: 'John Doe',
-    message: 'Welcome to our service!'
+    name: 'John',
+    company: 'Example Inc'
   }
 })
 ```
 
-### Middleware
-
-Add middleware to modify or validate emails before sending:
+## Configuration
 
 ```javascript
-postie.use(async (email) => {
-  // Add timestamp to subject
-  email.subject = `[${new Date().toISOString()}] ${email.subject}`;
-  
-  // Validate email
-  if (!email.from) {
-    throw new Error('Sender is required')
-  }
-  if (!email.to) {
-    throw new Error('Recipient is required')
-  }
-})
-```
-
-### Development Mode
-
-Enable development mode to prevent actual email sending:
-
-```javascript
+// Configure retry attempts and delay
 postie.configure({
-  devMode: true
-})
-
-// Emails will be logged but not sent
-await postie.send({
-  from: 'sender@example.com',
-  fromName: 'John Doe',
-  to: 'recipient@example.com',
-  toName: 'Jane Smith',
-  subject: 'Test Email',
-  text: 'This email will not be sent in dev mode.'
+  retryAttempts: 3, // Number of retry attempts
+  retryDelay: 1000, // Delay between retries in milliseconds
+  devMode: false // Enable development mode
 })
 ```
 
 ## CLI Usage
 
+### Configure SMTP Settings
+
 ```bash
-# Install globally
-npm install -g postie
+postie configure \
+  --host smtp.gmail.com \
+  --port 587 \
+  --user your-email@gmail.com \
+  --pass your-app-password \
+  --secure false
+```
 
-# Configure SMTP settings
-postie configure --host smtp.example.com --port 587 --user your-email@example.com --pass your-password
+### Send an Email
 
-# Send an email with names
+```bash
+# Basic email
 postie send \
   --from sender@example.com \
   --from-name "John Doe" \
@@ -235,40 +245,77 @@ postie send \
   --subject "Hello" \
   --text "This is a test email"
 
-# Send HTML email
+# Send to multiple recipients using JSON file
 postie send \
   --from sender@example.com \
-  --from-name "John Doe" \
+  --to recipients.json \
+  --subject "Hello" \
+  --text "This is a test email"
+
+# Send with HTML content from file
+postie send \
+  --from sender@example.com \
   --to recipient@example.com \
-  --to-name "Jane Smith" \
-  --subject "HTML Email" \
-  --html "<h1>Hello</h1>"
+  --subject "Hello" \
+  --html template.html
 
 # Send with attachments
 postie send \
   --from sender@example.com \
-  --from-name "John Doe" \
   --to recipient@example.com \
-  --to-name "Jane Smith" \
-  --subject "With Attachment" \
-  --text "See attached" \
-  --attachments file1.pdf,file2.jpg
+  --subject "Hello" \
+  --text "This is a test email" \
+  --attachments file1.pdf,file2.pdf
 ```
 
-## Development
+### JSON File Formats
 
-```bash
-# Install dependencies
-npm install
+#### Recipients JSON
+```json
+// Format 1: Array of strings
+["recipient1@example.com", "recipient2@example.com"]
 
-# Run tests
-npm test
+// Format 2: Array of objects
+[
+  { "email": "recipient1@example.com", "name": "Recipient 1" },
+  { "email": "recipient2@example.com", "name": "Recipient 2" }
+]
 
-# Run linter
-npm run lint
+// Format 3: Single string
+"recipient@example.com"
 
-# Run example
-npm run example
+// Format 4: Single object
+{ "email": "recipient@example.com", "name": "Recipient" }
+```
+
+## Development Mode
+
+Enable development mode to prevent actual email sending during testing:
+
+```javascript
+postie.configure({ devMode: true })
+```
+
+In development mode:
+- Emails are not actually sent
+- Email objects are logged to the console
+- All operations succeed without network calls
+
+## Error Handling
+
+The library includes automatic retry on failure and detailed error messages:
+
+```javascript
+try {
+  await postie.send({
+    from: 'sender@example.com',
+    to: 'recipient@example.com',
+    subject: 'Hello',
+    text: 'This is a test email'
+  })
+} catch (error) {
+  console.error('Failed to send email:', error.message)
+}
 ```
 
 ## License

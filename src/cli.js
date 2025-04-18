@@ -192,7 +192,18 @@ program
           throw new Error(`Recipients file not found: ${recipientsPath}`)
         }
         const recipients = JSON.parse(fs.readFileSync(recipientsPath, 'utf8'))
-        emailOptions.to = recipients;
+        if (Array.isArray(recipients)) {
+          emailOptions.to = recipients.map(recipient => {
+            if (typeof recipient === 'string') {
+              return recipient
+            }
+            return { email: recipient.email, name: recipient.name }
+          })
+        } else if (typeof recipients === 'string') {
+          emailOptions.to = recipients
+        } else {
+          emailOptions.to = { email: recipients.email, name: recipients.name }
+        }
       } else {
         // Single recipient with optional name
         emailOptions.to = options.toName ? { email: options.to, name: options.toName } : options.to;

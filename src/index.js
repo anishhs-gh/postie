@@ -85,13 +85,39 @@ class Postie {
       return { success: true, devMode: true, email: options }
     }
 
+    // Format email addresses
+    const email = {
+      from: typeof options.from === 'object' && options.from.email
+        ? this.formatEmailAddress(options.from.email, options.from.name)
+        : this.formatEmailAddress(options.from, options.fromName),
+      to: Array.isArray(options.to) 
+        ? options.to.map(addr => typeof addr === 'string' ? addr : this.formatEmailAddress(addr.email, addr.name))
+        : typeof options.to === 'object' && options.to.email
+          ? this.formatEmailAddress(options.to.email, options.to.name)
+          : this.formatEmailAddress(options.to, options.toName),
+      cc: options.cc ? (Array.isArray(options.cc)
+        ? options.cc.map(addr => typeof addr === 'string' ? addr : this.formatEmailAddress(addr.email, addr.name))
+        : typeof options.cc === 'object' && options.cc.email
+          ? this.formatEmailAddress(options.cc.email, options.cc.name)
+          : this.formatEmailAddress(options.cc, options.ccName)) : undefined,
+      bcc: options.bcc ? (Array.isArray(options.bcc)
+        ? options.bcc.map(addr => typeof addr === 'string' ? addr : this.formatEmailAddress(addr.email, addr.name))
+        : typeof options.bcc === 'object' && options.bcc.email
+          ? this.formatEmailAddress(options.bcc.email, options.bcc.name)
+          : this.formatEmailAddress(options.bcc, options.bccName)) : undefined,
+      subject: options.subject || 'No Subject',
+      text: options.text,
+      html: options.html,
+      attachments: options.attachments,
+    }
+
     let attempts = 0
     let lastError = null
 
     while (attempts < this.config.retryAttempts) {
       try {
-        const result = await this.transporter.sendMail(options)
-        this.logger.info(`Email sent successfully to ${options.to}`)
+        const result = await this.transporter.sendMail(email)
+        this.logger.info(`Email sent successfully to ${email.to}`)
         return { success: true, messageId: result.messageId }
       } catch (error) {
         attempts++
