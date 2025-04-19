@@ -290,18 +290,114 @@ postie send \
 }
 ```
 
-### Project Configuration (`.postierc`)
+### Project Configuration (.postierc)
 
+You can create a `.postierc` file in your project root to specify default options for that project. This is useful when you have project-specific email settings. The settings in `.postierc` will override the global configuration from `~/.postie/config.json`.
+
+Example `.postierc` file:
 ```json
 {
-  "from": "noreply@example.com",
-  "fromName": "Example Team",
-  "subject": "Default Subject",
-  "to": "team@example.com",
-  "toName": "Team Members",
-  "attachments": ["report.pdf"]
+  "emailDefaults": {
+    // Basic email options
+    "from": "project@example.com",
+    "fromName": "Project Team",
+    "subject": "Default Subject",
+    "text": "Default email content",
+    "html": "<h1>Default HTML content</h1>",
+
+    // Recipients
+    "to": "team@example.com",
+    "toName": "Team Members",
+    "cc": "manager@example.com",
+    "ccName": "Project Manager",
+    "bcc": "archive@example.com",
+    "bccName": "Archive",
+
+    // Multiple recipients (array format)
+    "to": [
+      "team@example.com",
+      { "email": "manager@example.com", "name": "Project Manager" }
+    ],
+    "cc": [
+      "stakeholder@example.com",
+      { "email": "reviewer@example.com", "name": "Code Reviewer" }
+    ],
+    "bcc": [
+      "archive@example.com",
+      { "email": "audit@example.com", "name": "Audit Team" }
+    ],
+
+    // Attachments
+    "attachments": [
+      "docs/report.pdf",
+      "docs/status.xlsx"
+    ]
+  },
+
+  // SMTP settings (overrides global config)
+  "smtp": {
+    "host": "smtp.project.com",
+    "port": 587,
+    "secure": false,
+    "auth": {
+      "user": "project@example.com",
+      "pass": "project-password"
+    },
+    "debug": true,
+    "logger": true
+  },
+
+  // Postie configuration (overrides global config)
+  "configure": {
+    "devMode": false,
+    "retryAttempts": 3,
+    "retryDelay": 1000
+  },
+
+  // Template configuration
+  "template": {
+    "path": "templates/default.hbs",
+    "data": {
+      "projectName": "My Project",
+      "teamName": "Development Team"
+    }
+  },
+
+  // Middleware configuration
+  "middleware": [
+    {
+      "name": "addCustomHeader",
+      "enabled": true,
+      "config": {
+        "headerName": "X-Project-ID",
+        "headerValue": "PROJ-123"
+      }
+    },
+    {
+      "name": "logEmail",
+      "enabled": true
+    }
+  ]
 }
 ```
+
+The CLI will automatically use these options when sending emails, but you can override them with command-line arguments. The configuration precedence is:
+
+1. Command line arguments (highest priority)
+2. `.postierc` settings
+3. Global configuration (`~/.postie/config.json`)
+
+For example, to send an email using the defaults from `.postierc`:
+```bash
+postie send
+```
+
+To override specific options:
+```bash
+postie send --to "override@example.com" --subject "Custom Subject"
+```
+
+All SMTP settings in `.postierc` will take precedence over the global configuration. This allows you to have different SMTP settings for different projects.
 
 ## ⚠️ Error Handling
 
