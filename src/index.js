@@ -7,20 +7,26 @@ class Postie {
     this.config = {
       devMode: false,
       retryAttempts: 3,
-      retryDelay: 1000,
-      templateEngine: null, // Default to no template engine
+      retryDelay: 1000
     }
     this.middleware = [];
     this.transporter = null;
+    this.templateEngine = null;
     this.logger = {
       info: (msg) => console.log(`[INFO] ${new Date().toISOString()} - ${msg}`),
       debug: (msg) => console.log(`[DEBUG] ${new Date().toISOString()} - ${msg}`),
-      error: (msg) => console.error(`[ERROR] ${new Date().toISOString()} - ${msg}`),
+      error: (msg) => console.error(`[ERROR] ${new Date().toISOString()} - ${msg}`)
     }
   }
 
   configure(config) {
-    this.config = { ...this.config, ...config }
+    // Only update the config properties that are allowed
+    this.config = {
+      ...this.config,
+      devMode: config.devMode ?? this.config.devMode,
+      retryAttempts: config.retryAttempts ?? this.config.retryAttempts,
+      retryDelay: config.retryDelay ?? this.config.retryDelay
+    }
     return this;
   }
 
@@ -29,12 +35,8 @@ class Postie {
     return this;
   }
 
-  setTransporter(transporterConfig) {
-    // Ensure password is trimmed
-    if (transporterConfig.auth && transporterConfig.auth.pass) {
-      transporterConfig.auth.pass = transporterConfig.auth.pass.trim()
-    }
-    this.transporter = nodemailer.createTransport(transporterConfig)
+  setTransporter(config) {
+    this.transporter = nodemailer.createTransport(config)
     return this;
   }
 
@@ -62,11 +64,13 @@ class Postie {
   }
 
   setTemplateEngine(engine) {
-    if (typeof engine.compile !== 'function') {
-      throw new Error('Template engine must have a compile method')
+    if (!engine || typeof engine !== 'object') {
+      throw new Error('Template engine must be an object')
     }
-    this.config.templateEngine = engine;
-    return this;
+    if (typeof engine.render !== 'function') {
+      throw new Error('Template engine must implement render method')
+    }
+    this.templateEngine = engine
   }
 
   formatEmailAddress(email, name) {
@@ -76,93 +80,106 @@ class Postie {
   }
 
   async send(options) {
-    try {
-      if (!this.transporter) {
-        throw new Error('Transporter not configured. Please call setTransporter() first.')
-      }
+    if (!this.transporter) {
+      throw new Error('Transporter not configured. Please call setTransporter() first.')
+    }
 
-      const email = {
-        from: typeof options.from === 'object' && options.from.email
-          ? this.formatEmailAddress(options.from.email, options.from.name)
-          : this.formatEmailAddress(options.from, options.fromName),
-        to: Array.isArray(options.to) 
-          ? options.to.map(addr => typeof addr === 'string' ? addr : this.formatEmailAddress(addr.email, addr.name))
-          : typeof options.to === 'object' && options.to.email
-            ? this.formatEmailAddress(options.to.email, options.to.name)
-            : this.formatEmailAddress(options.to, options.toName),
-        cc: options.cc ? (Array.isArray(options.cc)
-          ? options.cc.map(addr => typeof addr === 'string' ? addr : this.formatEmailAddress(addr.email, addr.name))
-          : typeof options.cc === 'object' && options.cc.email
-            ? this.formatEmailAddress(options.cc.email, options.cc.name)
-            : this.formatEmailAddress(options.cc, options.ccName)) : undefined,
-        bcc: options.bcc ? (Array.isArray(options.bcc)
-          ? options.bcc.map(addr => typeof addr === 'string' ? addr : this.formatEmailAddress(addr.email, addr.name))
-          : typeof options.bcc === 'object' && options.bcc.email
-            ? this.formatEmailAddress(options.bcc.email, options.bcc.name)
-            : this.formatEmailAddress(options.bcc, options.bccName)) : undefined,
-        subject: options.subject || 'No Subject',
-        text: options.text,
-        html: options.html,
-        attachments: options.attachments,
-      }
+    if (this.config.devMode) {
+      this.logger.info('Dev mode enabled - email not sent')
+      this.logger.debug('Email object:', options)
+      return { success: true, devMode: true, email: options }
+    }
 
-      // Apply middleware
-      for (const fn of this.middleware) {
-        await fn(email)
-      }
+    // Format email addresses
+    const email = {
+      from: typeof options.from === 'object' && options.from.email
+        ? this.formatEmailAddress(options.from.email, options.from.name)
+        : this.formatEmailAddress(options.from, options.fromName),
+      to: Array.isArray(options.to) 
+        ? options.to.map(addr => typeof addr === 'string' ? addr : this.formatEmailAddress(addr.email, addr.name))
+        : typeof options.to === 'object' && options.to.email
+          ? this.formatEmailAddress(options.to.email, options.to.name)
+          : this.formatEmailAddress(options.to, options.toName),
+      cc: options.cc ? (Array.isArray(options.cc)
+        ? options.cc.map(addr => typeof addr === 'string' ? addr : this.formatEmailAddress(addr.email, addr.name))
+        : typeof options.cc === 'object' && options.cc.email
+          ? this.formatEmailAddress(options.cc.email, options.cc.name)
+          : this.formatEmailAddress(options.cc, options.ccName)) : undefined,
+      bcc: options.bcc ? (Array.isArray(options.bcc)
+        ? options.bcc.map(addr => typeof addr === 'string' ? addr : this.formatEmailAddress(addr.email, addr.name))
+        : typeof options.bcc === 'object' && options.bcc.email
+          ? this.formatEmailAddress(options.bcc.email, options.bcc.name)
+          : this.formatEmailAddress(options.bcc, options.bccName)) : undefined,
+      subject: options.subject || 'No Subject',
+      text: options.text,
+      html: options.html,
+      attachments: options.attachments,
+    }
 
-      if (this.config.devMode) {
-        this.logger.info('Dev mode enabled - email not sent')
-        this.logger.debug('Email object:', JSON.stringify(email, null, 2))
-        return { success: true, devMode: true, email }
+    // Execute middleware chain
+    let middlewareIndex = 0;
+    const next = async () => {
+      if (middlewareIndex < this.middleware.length) {
+        const middleware = this.middleware[middlewareIndex++];
+        await middleware(email, next);
       }
+    };
 
-      let attempts = 0;
-      while (attempts < this.config.retryAttempts) {
-        try {
-          const info = await this.transporter.sendMail(email)
-          this.logger.info(`Email sent successfully to ${email.to}`)
-          return { success: true, info }
-        } catch (error) {
-          attempts++;
-          if (attempts === this.config.retryAttempts) {
-            throw error;
-          }
-          this.logger.error(`Attempt ${attempts} failed: ${error.message}`)
-          await new Promise(resolve => setTimeout(resolve, this.config.retryDelay))
+    // Start middleware chain
+    await next();
+
+    let attempts = 0
+    let lastError = null
+
+    while (attempts < this.config.retryAttempts) {
+      try {
+        const result = await this.transporter.sendMail(email)
+        this.logger.info(`Email sent successfully to ${email.to}`)
+        return { success: true, messageId: result.messageId }
+      } catch (error) {
+        attempts++
+        lastError = error
+        this.logger.error(`Attempt ${attempts} failed: ${error.message}`)
+        
+        if (attempts === this.config.retryAttempts) {
+          throw lastError
         }
+        
+        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay))
       }
-    } catch (error) {
-      this.logger.error(`Failed to send email: ${error.message}`)
-      throw error;
     }
   }
 
   async sendTemplate(options) {
-    const { template, data, ...emailOptions } = options;
-    
-    try {
-      if (!this.config.templateEngine) {
-        throw new Error('Template engine not configured. Please call setTemplateEngine() first.')
-      }
-
-      if (!template) {
-        throw new Error('Template path is required for sendTemplate')
-      }
-
-      const templatePath = path.resolve(process.cwd(), template)
-      const templateContent = fs.readFileSync(templatePath, 'utf8')
-      const compiledTemplate = this.config.templateEngine.compile(templateContent)
-      const html = compiledTemplate(data)
-
-      return this.send({
-        ...emailOptions,
-        html,
-      })
-    } catch (error) {
-      this.logger.error(`Failed to send template email: ${error.message}`)
-      throw error;
+    if (!options.template) {
+      throw new Error('Template not provided')
     }
+
+    if (!this.templateEngine) {
+      throw new Error('Template engine not configured')
+    }
+
+    let templateContent
+    // Check if template is a file path or template string
+    if (fs.existsSync(options.template)) {
+      templateContent = fs.readFileSync(options.template, 'utf8')
+    } else {
+      templateContent = options.template
+    }
+
+    let compiled
+    if (this.templateEngine.compile) {
+      compiled = this.templateEngine.compile(templateContent)
+    } else {
+      compiled = templateContent
+    }
+
+    const html = this.templateEngine.render(compiled, options.data || {})
+
+    return this.send({
+      ...options,
+      html
+    })
   }
 
   notify(options) {
@@ -188,4 +205,4 @@ class Postie {
   }
 }
 
-module.exports = new Postie() 
+module.exports = Postie 

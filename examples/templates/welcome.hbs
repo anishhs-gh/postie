@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>Welcome Email</title>
+    <title>Welcome to {{company}}</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -13,32 +12,49 @@
             padding: 20px;
         }
         .header {
-            background-color: #f4f4f4;
+            background-color: #f8f9fa;
             padding: 20px;
-            text-align: center;
+            border-radius: 5px;
+            margin-bottom: 20px;
         }
         .content {
+            background-color: #ffffff;
             padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
         }
         .footer {
+            margin-top: 20px;
             text-align: center;
-            padding: 20px;
-            font-size: 12px;
-            color: #666;
+            font-size: 0.9em;
+            color: #6c757d;
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>Welcome to Our Service!</h1>
+        <h1>Welcome to {{company}}!</h1>
     </div>
+    
     <div class="content">
-        <p>Hello {{name}},</p>
-        <p>{{message}}</p>
-        <p>We're excited to have you on board. If you have any questions, feel free to reach out to our support team.</p>
+        <p>Dear {{name}},</p>
+        
+        <p>We're excited to welcome you as our new {{role}}! We're confident that your skills and experience will be a great addition to our team.</p>
+        
+        <p>Here's what you can expect:</p>
+        <ul>
+            <li>Team orientation</li>
+            <li>Project onboarding</li>
+            <li>System access setup</li>
+        </ul>
+        
+        <p>If you have any questions, feel free to reach out to your team lead.</p>
+        
+        <p>Best regards,<br>The {{company}} Team</p>
     </div>
+    
     <div class="footer">
-        <p>This is an automated message. Please do not reply to this email.</p>
+        <p>This is an automated email from {{company}}</p>
     </div>
 </body>
 </html> 
