@@ -7,6 +7,9 @@
 - 💼 LinkedIn: [@anishsh](https://linkedin.com/in/anishsh)
 - 📧 Email: [mail@anishhs.com](mailto:mail@anishhs.com) (for feedback and support)
 
+## 📦 Version
+Current version: 1.0.2
+
 ## 📑 Table of Contents
 1. [Installation](#installation)
 2. [Basic Setup](#basic-setup)
@@ -187,26 +190,93 @@ await postie.ping({
 
 ## 📋 Template Support
 
-### Setup Template Engine
+### Template Engine Setup
 
+Postie supports any template engine that follows the standard template engine interface. Here are examples for different template engines:
+
+#### Handlebars
 ```javascript
 const Handlebars = require('handlebars')
-postie.setTemplateEngine(Handlebars)
+const handlebarsEngine = {
+  compile: Handlebars.compile,
+  render: (compiled, data) => compiled(data)
+}
+postie.setTemplateEngine(handlebarsEngine)
+```
+
+#### EJS
+```javascript
+const ejs = require('ejs')
+const ejsEngine = {
+  compile: (template) => ejs.compile(template),
+  render: (compiled, data) => compiled(data)
+}
+postie.setTemplateEngine(ejsEngine)
+```
+
+#### Custom Template Engine
+You can create your own simple template engine:
+
+```javascript
+const customEngine = {
+  render: (template, data) => {
+    return template.replace(/\{\{(\w+)\}\}/g, (match, key) => data[key] || match)
+  }
+}
+postie.setTemplateEngine(customEngine)
 ```
 
 ### Send Template Email
 
+You can send template emails in two ways:
+
+1. Using a template string:
 ```javascript
 await postie.sendTemplate({
   from: 'sender@example.com',
   to: 'recipient@example.com',
   subject: 'Welcome',
-  template: './templates/welcome.hbs',
+  template: 'Hello {{name}}, Welcome to {{company}}!',
   data: {
-    name: 'John',
-    company: 'Example Inc'
+    name: 'John Doe',
+    company: 'Our Company'
   }
 })
+```
+
+2. Using a template file:
+```javascript
+await postie.sendTemplate({
+  from: 'sender@example.com',
+  to: 'recipient@example.com',
+  subject: 'Welcome',
+  template: path.join(__dirname, 'templates/welcome.hbs'),
+  data: {
+    name: 'John Doe',
+    company: 'Our Company',
+    role: 'Developer'
+  }
+})
+```
+
+### Template Engine Interface
+
+To use a custom template engine, implement the following interface:
+
+```javascript
+const customEngine = {
+  // Required: Function to render the template with data
+  render: (template, data) => {
+    // Return the rendered template string
+    return renderedTemplate
+  },
+  
+  // Optional: Function to compile the template
+  compile: (template) => {
+    // Return a compiled template function
+    return compiledTemplate
+  }
+}
 ```
 
 ## 🔌 Middleware

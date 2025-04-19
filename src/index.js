@@ -64,8 +64,13 @@ class Postie {
   }
 
   setTemplateEngine(engine) {
-    this.templateEngine = engine;
-    return this;
+    if (!engine || typeof engine !== 'object') {
+      throw new Error('Template engine must be an object')
+    }
+    if (typeof engine.render !== 'function') {
+      throw new Error('Template engine must implement render method')
+    }
+    this.templateEngine = engine
   }
 
   formatEmailAddress(email, name) {
@@ -147,21 +152,29 @@ class Postie {
 
   async sendTemplate(options) {
     if (!options.template) {
-      throw new Error('Template path is required')
+      throw new Error('Template not provided')
     }
 
     if (!this.templateEngine) {
-      throw new Error('Template engine not configured. Please call setTemplateEngine() first.')
+      throw new Error('Template engine not configured')
     }
 
-    const templatePath = path.resolve(options.template)
-    if (!fs.existsSync(templatePath)) {
-      throw new Error(`Template file not found: ${templatePath}`)
+    let templateContent
+    // Check if template is a file path or template string
+    if (fs.existsSync(options.template)) {
+      templateContent = fs.readFileSync(options.template, 'utf8')
+    } else {
+      templateContent = options.template
     }
 
-    const templateContent = fs.readFileSync(templatePath, 'utf8')
-    const template = this.templateEngine.compile(templateContent)
-    const html = template(options.data)
+    let compiled
+    if (this.templateEngine.compile) {
+      compiled = this.templateEngine.compile(templateContent)
+    } else {
+      compiled = templateContent
+    }
+
+    const html = this.templateEngine.render(compiled, options.data || {})
 
     return this.send({
       ...options,
