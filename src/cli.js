@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
 const { program } = require('commander')
-const postie = require('./index')
+const Postie = require('./index')
 const fs = require('fs')
 const path = require('path')
+
+// Create a new Postie instance
+const postie = new Postie()
 
 // Configuration file path
 const CONFIG_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.postie', 'config.json')
@@ -39,12 +42,115 @@ function loadConfig() {
 function loadRCOptions() {
   try {
     if (fs.existsSync(RC_FILE)) {
-      return JSON.parse(fs.readFileSync(RC_FILE, 'utf8'))
+      const rcConfig = JSON.parse(fs.readFileSync(RC_FILE, 'utf8'))
+      
+      // Configure Postie with RC settings if present
+      if (rcConfig.configure) {
+        postie.configure({
+          devMode: rcConfig.configure.devMode,
+          retryAttempts: rcConfig.configure.retryAttempts,
+          retryDelay: rcConfig.configure.retryDelay
+        })
+      }
+
+      // Set up SMTP transporter if present
+      if (rcConfig.smtp) {
+        postie.setTransporter(rcConfig.smtp)
+      }
+
+      return rcConfig
     }
   } catch (error) {
     console.error('Error loading .postierc file:', error.message)
   }
-  return null;
+  return null
+}
+
+// Merge command line options with .postierc defaults
+function mergeOptions(cmdOptions, rcConfig) {
+  if (!rcConfig) return cmdOptions
+
+  // Start with .postierc defaults
+  const merged = { ...rcConfig.emailDefaults }
+
+  // Override with command line options
+  Object.keys(cmdOptions).forEach(key => {
+    if (cmdOptions[key] !== undefined) {
+      merged[key] = cmdOptions[key]
+    }
+  })
+
+  // Handle name fields after all options are merged
+  const emailFields = ['from', 'to', 'cc', 'bcc']
+  emailFields.forEach(field => {
+    const nameField = `${field}Name`
+    if (merged[nameField]) {
+      // If the field is already an array, add the new recipient
+      if (Array.isArray(merged[field])) {
+        merged[field].push({ email: merged[field], name: merged[nameField] })
+      } else {
+        // Otherwise create a new object
+        merged[field] = { email: merged[field], name: merged[nameField] }
+      }
+      delete merged[nameField]
+    }
+  })
+
+  return merged
+}
+
+// Handle JSON file for recipients
+function handleRecipientsFromFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Recipients file not found: ${filePath}`)
+  }
+  const recipients = JSON.parse(fs.readFileSync(filePath, 'utf8'))
+  return Array.isArray(recipients)
+    ? recipients.map(recipient => typeof recipient === 'string' ? recipient : { email: recipient.email, name: recipient.name })
+    : typeof recipients === 'string' ? recipients : { email: recipients.email, name: recipients.name }
+}
+
+// Handle HTML from file
+function handleHtmlFromFile(filePath) {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`HTML file not found: ${filePath}`)
+  }
+  return fs.readFileSync(filePath, 'utf8')
+}
+
+// Handle attachments
+function handleAttachments(attachments) {
+  return Array.isArray(attachments)
+    ? attachments.map(file => ({
+        filename: path.basename(file),
+        path: path.resolve(process.cwd(), file)
+      }))
+    : attachments.split(',').map(file => ({
+        filename: path.basename(file),
+        path: path.resolve(process.cwd(), file)
+      }))
+}
+
+// Validate required email options
+function validateEmailOptions(options) {
+  const errors = []
+  
+  if (!options.from) {
+    errors.push('Sender email is required. Use --from or provide it in .postierc')
+  }
+  if (!options.to) {
+    errors.push('Recipient is required. Use --to or provide it in .postierc')
+  }
+  if (!options.subject) {
+    errors.push('Subject is required. Use --subject or provide it in .postierc')
+  }
+  if (!options.text && !options.html) {
+    errors.push('Email content is required. Use --text or --html or provide it in .postierc')
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Missing required options:\n${errors.join('\n')}`)
+  }
 }
 
 // Save configuration
@@ -61,7 +167,7 @@ function saveConfig(config) {
 program
   .name('postie')
   .description('Postie email sending tool')
-  .version('1.0.0')
+  .version('1.0.2')
 
 // Configure command
 program
@@ -148,90 +254,35 @@ program
   .option('--attachments <files>', 'Comma-separated list of attachment files')
   .action(async (options) => {
     try {
-      // Try to load configuration
+      // Step 1: Load global config
       if (!loadConfig()) {
-        throw new Error('SMTP not configured. Please run "postie configure" first.')
+        throw new Error('SMTP not configured. Please either:\n' +
+          '1. Run "postie configure" to set up global SMTP settings, or\n' +
+          '2. Create a .postierc file in your project root with SMTP configuration')
       }
 
-      // Check if SMTP is configured
-      if (!postie.transporter) {
-        throw new Error('SMTP not configured. Please run "postie configure" first.')
+      // Step 2: Load and merge .postierc with command line options
+      const rcConfig = loadRCOptions()
+      const mergedOptions = mergeOptions(options, rcConfig)
+
+      // Step 3: Validate required options
+      validateEmailOptions(mergedOptions)
+
+      // Step 4: Handle special cases
+      if (typeof mergedOptions.to === 'string' && mergedOptions.to.endsWith('.json')) {
+        mergedOptions.to = handleRecipientsFromFile(path.resolve(process.cwd(), mergedOptions.to))
       }
 
-      // Load options from .postierc if no options provided
-      const rcOptions = loadRCOptions()
-      if (rcOptions && Object.keys(options).length === 0) {
-        options = rcOptions;
+      if (typeof mergedOptions.html === 'string' && mergedOptions.html.endsWith('.html')) {
+        mergedOptions.html = handleHtmlFromFile(path.resolve(process.cwd(), mergedOptions.html))
       }
 
-      // Validate required options
-      if (!options.from) {
-        throw new Error('Sender email is required. Use --from or provide it in .postierc')
-      }
-      if (!options.to) {
-        throw new Error('Recipient is required. Use --to or provide it in .postierc')
-      }
-      if (!options.subject) {
-        throw new Error('Subject is required. Use --subject or provide it in .postierc')
+      if (mergedOptions.attachments) {
+        mergedOptions.attachments = handleAttachments(mergedOptions.attachments)
       }
 
-      // Prepare email options
-      const emailOptions = {
-        from: options.fromName ? { email: options.from, name: options.fromName } : options.from,
-        subject: options.subject
-      }
-
-      // Handle recipients (to)
-      if (options.to.endsWith('.json')) {
-        // Read recipients from JSON file
-        const recipientsPath = path.resolve(process.cwd(), options.to)
-        if (!fs.existsSync(recipientsPath)) {
-          throw new Error(`Recipients file not found: ${recipientsPath}`)
-        }
-        const recipients = JSON.parse(fs.readFileSync(recipientsPath, 'utf8'))
-        emailOptions.to = recipients;
-      } else {
-        // Single recipient with optional name
-        emailOptions.to = options.toName ? { email: options.to, name: options.toName } : options.to;
-      }
-
-      // Add CC if provided
-      if (options.cc) {
-        emailOptions.cc = options.ccName ? { email: options.cc, name: options.ccName } : options.cc;
-      }
-
-      // Add BCC if provided
-      if (options.bcc) {
-        emailOptions.bcc = options.bccName ? { email: options.bcc, name: options.bccName } : options.bcc;
-      }
-
-      // Add content
-      if (options.text) {
-        emailOptions.text = options.text;
-      }
-      if (options.html) {
-        if (options.html.endsWith('.html')) {
-          // Read HTML from file
-          const htmlPath = path.resolve(process.cwd(), options.html)
-          if (!fs.existsSync(htmlPath)) {
-            throw new Error(`HTML file not found: ${htmlPath}`)
-          }
-          emailOptions.html = fs.readFileSync(htmlPath, 'utf8')
-        } else {
-          emailOptions.html = options.html;
-        }
-      }
-
-      // Add attachments if provided
-      if (options.attachments) {
-        emailOptions.attachments = options.attachments.split(',').map(file => ({
-          filename: path.basename(file),
-          path: path.resolve(process.cwd(), file)
-        }))
-      }
-
-      // Send email
-      await postie.send(emailOptions)
+      // Send email with final options
+      await postie.send(mergedOptions)
       console.log('Email sent successfully!')
     } catch (error) {
       console.error('Error sending email:', error.message)
