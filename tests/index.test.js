@@ -3,6 +3,9 @@ const nodemailer = require('nodemailer')
 const path = require('path')
 const fs = require('fs')
 
+// npm install handlebars
+// npm install ejs
+
 // Mock nodemailer
 jest.mock('nodemailer')
 
@@ -453,5 +456,118 @@ describe('Template Engine', () => {
 
     // Clean up
     fs.unlinkSync(templatePath)
+  })
+})
+
+describe('Event-Based Email Triggering', () => {
+  let postie
+  let mockSendMail
+
+  beforeEach(() => {
+    postie = new Postie()
+    mockSendMail = jest.fn().mockResolvedValue({ messageId: 'test-message-id' })
+    // Create a mock transporter with the mockSendMail function
+    const mockTransporter = { sendMail: mockSendMail }
+    // Set the mock transporter directly
+    postie.transporter = mockTransporter
+  })
+
+  test('should define and trigger a basic email event', async () => {
+    postie.define('test-event', {
+      from: 'test@example.com',
+      subject: 'Test Event',
+      text: 'This is a test event'
+    })
+
+    await postie.trigger('test-event', { to: 'recipient@example.com' })
+
+    expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({
+      from: 'test@example.com',
+      to: 'recipient@example.com',
+      subject: 'Test Event',
+      text: 'This is a test event'
+    }))
+  })
+
+  test('should override event configuration when triggering', async () => {
+    postie.define('test-event', {
+      from: 'test@example.com',
+      subject: 'Original Subject',
+      text: 'Original text'
+    })
+
+    await postie.trigger('test-event', {
+      to: 'recipient@example.com',
+      subject: 'New Subject',
+      text: 'New text'
+    })
+
+    expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({
+      from: 'test@example.com',
+      to: 'recipient@example.com',
+      subject: 'New Subject',
+      text: 'New text'
+    }))
+  })
+
+  test('should handle template events', async () => {
+    const Handlebars = require('handlebars')
+    postie.setTemplateEngine({
+      compile: Handlebars.compile,
+      render: (compiled, data) => compiled(data)
+    })
+
+    postie.define('welcome-email', {
+      from: 'welcome@example.com',
+      subject: 'Welcome',
+      template: 'Hello {{name}}!',
+      data: {
+        company: 'Example Inc'
+      }
+    })
+
+    await postie.trigger('welcome-email', {
+      to: 'recipient@example.com',
+      data: {
+        name: 'John'
+      }
+    })
+
+    expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({
+      from: 'welcome@example.com',
+      to: 'recipient@example.com',
+      subject: 'Welcome',
+      html: 'Hello John!'
+    }))
+  })
+
+  test('should handle special type events', async () => {
+    postie.define('system-alert', {
+      type: 'alert',
+      from: 'system@example.com',
+      subject: 'System Alert',
+      text: 'System is down'
+    })
+
+    await postie.trigger('system-alert', { to: 'admin@example.com' })
+
+    expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({
+      from: 'system@example.com',
+      to: 'admin@example.com',
+      subject: '[ALERT] System Alert',
+      text: 'System is down'
+    }))
+  })
+
+  test('should throw error for undefined event', async () => {
+    await expect(postie.trigger('undefined-event')).rejects.toThrow('Event "undefined-event" is not defined')
+  })
+
+  test('should throw error for invalid event name', () => {
+    expect(() => postie.define(123, {})).toThrow('Event name must be a string')
+  })
+
+  test('should throw error for invalid event configuration', () => {
+    expect(() => postie.define('test', null)).toThrow('Event configuration must be an object')
   })
 }) 

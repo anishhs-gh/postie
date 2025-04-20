@@ -1,6 +1,6 @@
 {
   "name": "@anishhs/postie",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A simple and powerful email sending library for Node.js with CLI support",
   "main": "src/index.js",
   "bin": {
@@ -21,14 +21,17 @@
     "cli",
     "template",
     "notification",
-    "command-line"
+    "command-line",
+    "postie",
+    "wrapper",
+    "extensions",
+    "aliases",
+    "anishhs"
   ],
   "author": "Anish Shekh",
   "license": "MIT",
   "dependencies": {
     "commander": "^11.1.0",
-    "ejs": "^3.1.10",
-    "handlebars": "^4.7.8",
     "nodemailer": "^6.9.9"
   },
   "devDependencies": {
