@@ -1,6 +1,5 @@
 const Postie = require('../src')
-const Handlebars = require('handlebars')
-const fs = require('fs')
+const Handlebars = require('handlebars') // npm install handlebars, ejs
 const path = require('path')
 
 // Create a new Postie instance

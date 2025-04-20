@@ -167,7 +167,7 @@ function saveConfig(config) {
 program
   .name('postie')
   .description('Postie email sending tool')
-  .version('1.0.2')
+  .version('1.0.3')
 
 // Configure command
 program
@@ -252,6 +252,7 @@ program
   .option('--text <text>', 'Plain text content')
   .option('--html <html|file>', 'HTML content or path to HTML file (.html)')
   .option('--attachments <files>', 'Comma-separated list of attachment files')
+  .option('--alias <alias>', 'Use a predefined alias from .postierc')
   .action(async (options) => {
     try {
       // Step 1: Load global config
@@ -263,6 +264,40 @@ program
 
       // Step 2: Load and merge .postierc with command line options
       const rcConfig = loadRCOptions()
+      
+      // If using an alias, handle it through the event system
+      if (options.alias) {
+        if (!rcConfig || !rcConfig.aliases || !rcConfig.aliases[options.alias]) {
+          throw new Error(`Alias "${options.alias}" not found in .postierc`)
+        }
+
+        // Define the event for this alias
+        const aliasConfig = rcConfig.aliases[options.alias]
+        postie.define(options.alias, aliasConfig)
+
+        // Remove alias-specific options before merging
+        const { alias, ...sendOptions } = options
+
+        // Handle special cases for alias overrides
+        if (sendOptions.to && typeof sendOptions.to === 'string' && sendOptions.to.endsWith('.json')) {
+          sendOptions.to = handleRecipientsFromFile(path.resolve(process.cwd(), sendOptions.to))
+        }
+
+        if (sendOptions.html && typeof sendOptions.html === 'string' && sendOptions.html.endsWith('.html')) {
+          sendOptions.html = handleHtmlFromFile(path.resolve(process.cwd(), sendOptions.html))
+        }
+
+        if (sendOptions.attachments) {
+          sendOptions.attachments = handleAttachments(sendOptions.attachments)
+        }
+
+        // Trigger the event with overrides
+        await postie.trigger(options.alias, sendOptions)
+        console.log('Email sent successfully!')
+        return
+      }
+
+      // Continue with normal send flow
       const mergedOptions = mergeOptions(options, rcConfig)
 
       // Step 3: Validate required options
