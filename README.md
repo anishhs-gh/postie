@@ -8,19 +8,21 @@
 - 📧 Email: [mail@anishhs.com](mailto:mail@anishhs.com) (for feedback and support)
 
 ## 📦 Version
-Current version: 1.0.2
+Current version: 1.0.3
 
 ## 📑 Table of Contents
-1. [Installation](#installation)
-2. [Basic Setup](#basic-setup)
-3. [Core Methods](#core-methods)
-4. [Email Sending](#email-sending)
-5. [Template Support](#template-support)
-6. [Configuration](#configuration)
-7. [Middleware](#middleware)
-8. [CLI Usage](#cli-usage)
-9. [Configuration Files](#configuration-files)
-10. [Error Handling](#error-handling)
+1. [Installation](#-installation)
+2. [Configuration](#-configuration)
+3. [Basic Setup](#-basic-setup)
+4. [Core Methods](#-core-methods)
+5. [Email Sending](#-email-sending)
+6. [Template Support](#-template-support)
+7. [Middleware](#-middleware)
+8. [Email Triggering By Aliases](#-email-triggering-by-aliases)
+9. [CLI Usage](#-cli-usage)
+10. [Configuration Files](#-configuration-files)
+11. [Error Handling](#-error-handling)
+12. [Development Mode](#-development-mode)
 
 ## 📦 Installation
 
@@ -30,6 +32,48 @@ npm install @anishhs/postie
 
 # Or install globally for CLI usage
 npm install -g @anishhs/postie
+```
+
+## ⚙️ Configuration
+
+Postie provides flexible configuration options that can be set globally or per instance.
+
+### Global Configuration
+
+```javascript
+// Configure global settings
+postie.configure({
+  devMode: false,      // Enable development mode
+  retryAttempts: 3,    // Number of retry attempts
+  retryDelay: 1000     // Delay between retries in milliseconds
+})
+```
+
+### SMTP Configuration
+
+```javascript
+// Configure SMTP settings
+postie.setTransporter({
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: 'your-email@gmail.com',
+    pass: 'your-app-password'
+  }
+})
+```
+
+### Template Engine Configuration
+
+```javascript
+// Configure template engine
+postie.setTemplateEngine({
+  render: (template, data) => {
+    // Custom template rendering logic
+    return renderedTemplate
+  }
+})
 ```
 
 ## ⚙️ Basic Setup
@@ -300,6 +344,76 @@ postie.use((emailOptions, next) => {
 })
 ```
 
+## 📧 Email Triggering By Aliases
+
+Postie allows you to define reusable email configurations with aliases and trigger them with optional overrides. This is useful for setting up reusable email configurations.
+
+### Define an Alias
+
+```javascript
+// Define a welcome email alias
+postie.define('user-welcome', {
+  from: 'welcome@example.com',
+  subject: 'Welcome to Our Platform',
+  template: 'Hello {{name}}, welcome to {{company}}!',
+  data: {
+    company: 'Example Inc'
+  }
+})
+
+// Define a notification alias
+postie.define('system-update', {
+  type: 'notify',
+  from: 'system@example.com',
+  subject: 'System Update',
+  text: 'A new system update is available'
+})
+
+// Define an alert alias
+postie.define('high-usage', {
+  type: 'alert',
+  from: 'monitoring@example.com',
+  subject: 'High Resource Usage',
+  text: 'CPU usage is above 90%'
+})
+```
+
+### Trigger an Alias
+
+```javascript
+// Trigger welcome email with overrides
+await postie.trigger('user-welcome', {
+  to: 'john@example.com',
+  data: {
+    name: 'John Doe'
+  }
+})
+
+// Trigger system update
+await postie.trigger('system-update', {
+  to: 'admin@example.com'
+})
+
+// Trigger alert with custom message
+await postie.trigger('high-usage', {
+  to: 'admin@example.com',
+  text: 'Memory usage is above 95%'
+})
+```
+
+### Alias Configuration Options
+
+You can use any of the following options in your alias configuration:
+
+- Basic email options (`from`, `to`, `subject`, `text`, `html`)
+- Template options (`template`, `data`)
+- Special types (`type: 'notify'`, `type: 'alert'`, `type: 'ping'`)
+- Attachments
+- Headers
+- Any other options supported by the email sending methods
+
+When triggering an alias, you can override any of these options by passing them in the `overrides` object.
+
 ## 💻 CLI Usage
 
 ### Configure SMTP
@@ -337,6 +451,32 @@ postie send \
   --subject "Hello" \
   --text "This is a test email" \
   --attachments file1.pdf,file2.pdf
+```
+
+### Using CLI Aliases
+
+Postie supports predefined email configurations through CLI aliases in your `.postierc` file. These aliases use the event-based triggering system under the hood.
+
+```bash
+# Send a predefined notification
+postie send --alias notify-admin
+
+# Send a system alert
+postie send --alias system-alert
+```
+
+When you use a CLI alias:
+1. Postie looks up the alias configuration in your `.postierc` file
+2. It uses the event-based triggering system to send the email
+3. The email is sent using the configured SMTP settings
+
+You can override any alias configuration with command-line arguments:
+```bash
+# Override the recipient for a predefined notification
+postie send --alias notify-admin --to "different-admin@example.com"
+
+# Override the subject for a system alert
+postie send --alias system-alert --subject "Custom Alert"
 ```
 
 ## 📁 Configuration Files
@@ -424,85 +564,104 @@ Example `.postierc` file:
     "retryDelay": 1000
   },
 
-  // Template configuration
-  "template": {
-    "path": "templates/default.hbs",
-    "data": {
-      "projectName": "My Project",
-      "teamName": "Development Team"
-    }
-  },
-
-  // Middleware configuration
-  "middleware": [
-    {
-      "name": "addCustomHeader",
-      "enabled": true,
-      "config": {
-        "headerName": "X-Project-ID",
-        "headerValue": "PROJ-123"
+  // CLI Aliases
+  "aliases": {
+    "notify-admin": {
+      "to": "admin@example.com",
+      "subject": "Alert!",
+      "text": "Something happened"
+    },
+    "welcome-user": {
+      "type": "notify",
+      "to": "{{email}}",
+      "subject": "Welcome {{name}}!",
+      "template": "Hello {{name}}, welcome to our platform!",
+      "data": {
+        "company": "Example Inc"
       }
     },
-    {
-      "name": "logEmail",
-      "enabled": true
+    "system-alert": {
+      "type": "alert",
+      "to": "admin@example.com",
+      "subject": "System Alert",
+      "text": "{{message}}"
     }
-  ]
-}
-```
-
-The CLI will automatically use these options when sending emails, but you can override them with command-line arguments. The configuration precedence is:
-
-1. Command line arguments (highest priority)
-2. `.postierc` settings
-3. Global configuration (`~/.postie/config.json`)
-
-For example, to send an email using the defaults from `.postierc`:
-```bash
-postie send
-```
-
-To override specific options:
-```bash
-postie send --to "override@example.com" --subject "Custom Subject"
-```
-
-All SMTP settings in `.postierc` will take precedence over the global configuration. This allows you to have different SMTP settings for different projects.
-
-## ⚠️ Error Handling
-
-```javascript
-try {
-  await postie.send({
-    from: 'sender@example.com',
-    to: 'recipient@example.com',
-    subject: 'Hello',
-    text: 'This is a test email'
-  })
-} catch (error) {
-  console.error('Failed to send email:', error.message)
-  if (error.code === 'EAUTH') {
-    console.error('Authentication failed. Please check your credentials.')
   }
 }
 ```
 
-### Common Error Codes
+## 🚨 Error Handling
 
-- `EAUTH`: Authentication failed
-- `ECONNECTION`: Connection to SMTP server failed
-- `ETIMEDOUT`: Connection timed out
-- `ENOTFOUND`: SMTP host not found
+Postie provides comprehensive error handling for various scenarios:
 
-## 🧪 Development Mode
-
-Enable development mode to prevent actual email sending:
-
+### Connection Errors
 ```javascript
-postie.configure({ devMode: true })
+try {
+  await postie.testConnection()
+} catch (error) {
+  console.error('SMTP connection failed:', error.message)
+}
 ```
 
-In development mode:
-- Emails are not actually sent
-- Email objects are logged to the console
-- All operations succeed without network calls 
+### Email Sending Errors
+```javascript
+try {
+  await postie.send(emailOptions)
+} catch (error) {
+  console.error('Failed to send email:', error.message)
+  // Error details include:
+  // - SMTP response
+  // - Connection status
+  // - Retry attempts
+}
+```
+
+### Configuration Errors
+```javascript
+try {
+  postie.configure(invalidConfig)
+} catch (error) {
+  console.error('Invalid configuration:', error.message)
+}
+```
+
+### Retry Mechanism
+Postie automatically retries failed email sends based on configuration:
+- Number of retry attempts
+- Delay between retries
+- Exponential backoff
+
+## 🔧 Development Mode
+
+Development mode provides additional features for testing and debugging:
+
+### Enable Development Mode
+```javascript
+postie.configure({
+  devMode: true
+})
+```
+
+### Features in Development Mode
+1. **Email Preview**: Emails are not actually sent
+2. **Debug Logging**: Detailed logs of email processing
+3. **Template Testing**: Easy testing of email templates
+4. **Configuration Validation**: Strict validation of settings
+
+### Using Development Mode
+```javascript
+// Configure for development
+postie.configure({
+  devMode: true,
+  retryAttempts: 1,    // Fewer retries in development
+  retryDelay: 100      // Shorter delay in development
+})
+
+// Send test email
+await postie.send({
+  to: 'test@example.com',
+  subject: 'Test Email',
+  text: 'This is a test email'
+})
+// Email will be logged but not sent
+```

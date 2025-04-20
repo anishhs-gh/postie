@@ -17,6 +17,7 @@ class Postie {
       debug: (msg) => console.log(`[DEBUG] ${new Date().toISOString()} - ${msg}`),
       error: (msg) => console.error(`[ERROR] ${new Date().toISOString()} - ${msg}`)
     }
+    this.events = new Map()
   }
 
   configure(config) {
@@ -202,6 +203,59 @@ class Postie {
       subject: 'Ping',
       text: 'Ping!',
     })
+  }
+
+  /**
+   * Define an email event with its configuration
+   * @param {string} name - Event name
+   * @param {Object} config - Event configuration
+   * @returns {Postie} - Returns the Postie instance for chaining
+   */
+  define(name, config) {
+    if (typeof name !== 'string') {
+      throw new Error('Event name must be a string')
+    }
+
+    if (typeof config !== 'object' || config === null) {
+      throw new Error('Event configuration must be an object')
+    }
+
+    // Store the event configuration
+    this.events.set(name, config)
+    return this
+  }
+
+  /**
+   * Trigger a defined email event
+   * @param {string} name - Event name
+   * @param {Object} [overrides={}] - Optional overrides for the event configuration
+   * @returns {Promise} - Returns a promise that resolves when the email is sent
+   */
+  async trigger(name, overrides = {}) {
+    if (!this.events.has(name)) {
+      throw new Error(`Event "${name}" is not defined`)
+    }
+
+    const eventConfig = this.events.get(name)
+    const mergedConfig = { ...eventConfig, ...overrides }
+
+    // Handle different types of email sending based on the configuration
+    if (mergedConfig.template) {
+      return this.sendTemplate(mergedConfig)
+    } else if (mergedConfig.type) {
+      switch (mergedConfig.type.toLowerCase()) {
+        case 'notify':
+          return this.notify(mergedConfig)
+        case 'alert':
+          return this.alert(mergedConfig)
+        case 'ping':
+          return this.ping(mergedConfig)
+        default:
+          return this.send(mergedConfig)
+      }
+    } else {
+      return this.send(mergedConfig)
+    }
   }
 }
 
