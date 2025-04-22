@@ -8,23 +8,24 @@
 - 📧 Email: [mail@anishhs.com](mailto:mail@anishhs.com) (for feedback and support)
 
 ## 📦 Version
-Current version: 1.0.3
+Current version: 1.0.4
 
 ## 📑 Table of Contents
 1. [Installation](#-installation)
-2. [Configuration](#-configuration)
-3. [Basic Setup](#-basic-setup)
-4. [Core Methods](#-core-methods)
-5. [Email Sending](#-email-sending)
-6. [Template Support](#-template-support)
-7. [Middleware](#-middleware)
-8. [Email Triggering By Aliases](#-email-triggering-by-aliases)
-9. [CLI Usage](#-cli-usage)
-10. [Configuration Files](#-configuration-files)
-11. [Error Handling](#-error-handling)
-12. [Development Mode](#-development-mode)
+2. [TypeScript Support](#-typescript-support)
+3. [Configuration](#-configuration)
+4. [Basic Setup](#-basic-setup)
+5. [Core Methods](#-core-methods)
+6. [Email Sending](#-email-sending)
+7. [Template Support](#-template-support)
+8. [Middleware](#-middleware)
+9. [Email Triggering By Aliases](#-email-triggering-by-aliases)
+10. [CLI Usage](#-cli-usage)
+11. [Configuration Files](#-configuration-files)
+12. [Error Handling](#-error-handling)
+13. [Development Mode](#-development-mode)
 
-## 📦 Installation
+## 🚀 Installation
 
 ```bash
 # Install as a dependency in your project
@@ -33,6 +34,254 @@ npm install @anishhs/postie
 # Or install globally for CLI usage
 npm install -g @anishhs/postie
 ```
+
+## 📘 TypeScript Support
+
+Postie comes with full TypeScript support out of the box. All features are properly typed and documented. Here's how to use Postie with TypeScript:
+
+### Basic Setup
+
+```typescript
+import {
+  Postie,
+  SMTPConfig,
+  PostieConfig,
+  EmailOptions,
+  AliasConfig,
+  TemplateEngine,
+  Middleware,
+  SendResult
+} from '@anishhs/postie';
+
+// Create a Postie instance
+const postie = new Postie();
+```
+
+### Core Types
+
+```typescript
+// Email address can be a string or an object with name
+type EmailAddress = string | { email: string; name?: string };
+
+// Email attachment interface
+interface EmailAttachment {
+  filename?: string;
+  path?: string;
+  content?: string | Buffer;
+  contentType?: string;
+  encoding?: string;
+}
+
+// Email sending result
+interface SendResult {
+  success: boolean;
+  messageId?: string;
+  devMode?: boolean;
+  email?: EmailOptions;
+}
+```
+
+### SMTP Configuration
+
+```typescript
+const smtpConfig: SMTPConfig = {
+  host: 'smtp.example.com',
+  port: 587,
+  secure: false,
+  auth: {
+    user: 'sender@example.com',
+    pass: 'password'
+  },
+  debug: true,
+  logger: true
+};
+
+postie.setTransporter(smtpConfig);
+```
+
+### Global Configuration
+
+```typescript
+const postieConfig: PostieConfig = {
+  devMode: false,
+  retryAttempts: 3,
+  retryDelay: 1000
+};
+
+postie.configure(postieConfig);
+```
+
+### Sending Emails
+
+```typescript
+// Basic email
+const emailOptions: EmailOptions = {
+  from: 'sender@example.com',
+  fromName: 'Project Team',
+  to: 'to@example.com',
+  subject: 'Test Email',
+  text: 'This is a test email',
+  html: '<p>This is a test email</p>'
+};
+
+// Multiple recipients
+const multiRecipientEmail: EmailOptions = {
+  from: 'sender@example.com',
+  to: [
+    'to@example.com',
+    { email: 'sender@example.com', name: 'Team Member' }
+  ],
+  cc: [
+    'sender@example.com',
+    { email: 'to@example.com', name: 'Project Manager' }
+  ],
+  subject: 'Multi-recipient Email',
+  text: 'This email goes to multiple recipients'
+};
+
+// With attachments
+const emailWithAttachments: EmailOptions = {
+  from: 'sender@example.com',
+  to: 'to@example.com',
+  subject: 'Email with Attachments',
+  text: 'Please find the attached files',
+  attachments: [
+    {
+      filename: 'test.txt',
+      content: 'This is a test file content',
+      contentType: 'text/plain'
+    },
+    {
+      filename: 'document.pdf',
+      path: '/path/to/document.pdf',
+      contentType: 'application/pdf'
+    }
+  ]
+};
+
+const result: SendResult = await postie.send(emailOptions);
+```
+
+### Template Engine
+
+```typescript
+const templateEngine: TemplateEngine = {
+  compile: (template: string) => template,
+  render: (compiled: unknown, data: Record<string, any>) => {
+    return (compiled as string).replace(/\{\{(\w+)\}\}/g, (match: string, key: string) => data[key] || match);
+  }
+};
+
+postie.setTemplateEngine(templateEngine);
+
+// Send template email
+const templateResult: SendResult = await postie.sendTemplate({
+  from: 'sender@example.com',
+  to: 'to@example.com',
+  subject: 'Welcome',
+  template: 'Hello {{name}}, welcome to {{company}}!',
+  data: {
+    name: 'John Doe',
+    company: 'Example Inc'
+  }
+});
+```
+
+### Middleware
+
+```typescript
+const logMiddleware: Middleware = (options: EmailOptions, next: () => void) => {
+  console.log('Middleware: Preparing to send email to:', options.to);
+  next();
+};
+
+postie.use(logMiddleware);
+```
+
+### Aliases
+
+```typescript
+const welcomeAlias: AliasConfig = {
+  type: 'notify',
+  from: 'sender@example.com',
+  fromName: 'Project Team',
+  to: 'to@example.com',
+  subject: 'Welcome',
+  template: 'Hello {{name}}, welcome to {{company}}!',
+  data: {
+    company: 'Example Inc'
+  }
+};
+
+postie.define('welcome', welcomeAlias);
+
+// Trigger with overrides
+const result: SendResult = await postie.trigger('welcome', {
+  to: 'newuser@example.com',
+  data: {
+    name: 'John Doe'
+  }
+});
+```
+
+### Special Email Types
+
+```typescript
+// Notification
+const notificationResult: SendResult = await postie.notify({
+  to: 'to@example.com',
+  subject: 'System Notification',
+  text: 'This is a notification'
+});
+
+// Alert
+const alertResult: SendResult = await postie.alert({
+  to: 'to@example.com',
+  subject: 'System Alert',
+  text: 'This is an alert'
+});
+
+// Ping
+const pingResult: SendResult = await postie.ping({
+  to: 'to@example.com'
+});
+```
+
+### Error Handling
+
+```typescript
+try {
+  const result = await postie.send(emailOptions);
+  console.log('Email sent successfully:', result);
+} catch (error) {
+  console.error('Failed to send email:', error);
+  // Error details include:
+  // - SMTP response
+  // - Connection status
+  // - Retry attempts
+}
+```
+
+### Development Mode
+
+```typescript
+// Configure for development
+postie.configure({
+  devMode: true,
+  retryAttempts: 1,
+  retryDelay: 100
+});
+
+// Send test email
+const devResult: SendResult = await postie.send({
+  to: 'test@example.com',
+  subject: 'Test Email',
+  text: 'This is a test email'
+});
+// Email will be logged but not sent
+```
+
+## 📧 Basic Usage
 
 ## ⚙️ Configuration
 

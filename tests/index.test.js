@@ -274,9 +274,10 @@ describe('Postie', () => {
     });
 
     it('should handle middleware errors', async () => {
-      postie.use((email, next) => {
+      const errorMiddleware = (_email, _next) => {
         throw new Error('Middleware error');
-      });
+      };
+      postie.use(errorMiddleware);
 
       const emailOptions = {
         from: 'sender@example.com',

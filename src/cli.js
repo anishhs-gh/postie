@@ -167,7 +167,7 @@ function saveConfig(config) {
 program
   .name('postie')
   .description('Postie email sending tool')
-  .version('1.0.3');
+  .version('1.0.4');
 
 // Configure command
 program
@@ -276,7 +276,8 @@ program
         postie.define(options.alias, aliasConfig);
 
         // Remove alias-specific options before merging
-        const { alias, ...sendOptions } = options;
+        // const { alias, ...sendOptions } = options;
+        const { ...sendOptions } = options;
 
         // Handle special cases for alias overrides
         if (sendOptions.to && typeof sendOptions.to === 'string' && sendOptions.to.endsWith('.json')) {
