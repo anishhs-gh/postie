@@ -1,6 +1,5 @@
-const nodemailer = require('nodemailer')
-const fs = require('fs')
-const path = require('path')
+const nodemailer = require('nodemailer');
+const fs = require('fs');
 
 class Postie {
   constructor() {
@@ -8,7 +7,7 @@ class Postie {
       devMode: false,
       retryAttempts: 3,
       retryDelay: 1000
-    }
+    };
     this.middleware = [];
     this.transporter = null;
     this.templateEngine = null;
@@ -16,8 +15,8 @@ class Postie {
       info: (msg) => console.log(`[INFO] ${new Date().toISOString()} - ${msg}`),
       debug: (msg) => console.log(`[DEBUG] ${new Date().toISOString()} - ${msg}`),
       error: (msg) => console.error(`[ERROR] ${new Date().toISOString()} - ${msg}`)
-    }
-    this.events = new Map()
+    };
+    this.events = new Map();
   }
 
   configure(config) {
@@ -27,38 +26,38 @@ class Postie {
       devMode: config.devMode ?? this.config.devMode,
       retryAttempts: config.retryAttempts ?? this.config.retryAttempts,
       retryDelay: config.retryDelay ?? this.config.retryDelay
-    }
+    };
     return this;
   }
 
   use(middleware) {
-    this.middleware.push(middleware)
+    this.middleware.push(middleware);
     return this;
   }
 
   setTransporter(config) {
-    this.transporter = nodemailer.createTransport(config)
+    this.transporter = nodemailer.createTransport(config);
     return this;
   }
 
   async testConnection() {
     try {
       if (!this.transporter) {
-        throw new Error('Transporter not configured. Please call setTransporter() first.')
+        throw new Error('Transporter not configured. Please call setTransporter() first.');
       }
 
-      await this.transporter.verify()
-      this.logger.info('SMTP connection test successful')
+      await this.transporter.verify();
+      this.logger.info('SMTP connection test successful');
       return true;
     } catch (error) {
-      this.logger.error('SMTP Connection Test Failed:', error.message)
+      this.logger.error('SMTP Connection Test Failed:', error.message);
       if (error.code === 'EAUTH') {
-        this.logger.error('\nAuthentication failed. Please check:')
-        this.logger.error('1. Your email and password are correct')
-        this.logger.error('2. If using Gmail:')
-        this.logger.error('   - 2-Step Verification is enabled')
-        this.logger.error('   - You\'re using an App Password (not your regular password)')
-        this.logger.error('   - The App Password was generated for "Mail" and your device')
+        this.logger.error('\nAuthentication failed. Please check:');
+        this.logger.error('1. Your email and password are correct');
+        this.logger.error('2. If using Gmail:');
+        this.logger.error('   - 2-Step Verification is enabled');
+        this.logger.error('   - You\'re using an App Password (not your regular password)');
+        this.logger.error('   - The App Password was generated for "Mail" and your device');
       }
       return false;
     }
@@ -66,12 +65,12 @@ class Postie {
 
   setTemplateEngine(engine) {
     if (!engine || typeof engine !== 'object') {
-      throw new Error('Template engine must be an object')
+      throw new Error('Template engine must be an object');
     }
     if (typeof engine.render !== 'function') {
-      throw new Error('Template engine must implement render method')
+      throw new Error('Template engine must implement render method');
     }
-    this.templateEngine = engine
+    this.templateEngine = engine;
   }
 
   formatEmailAddress(email, name) {
@@ -82,13 +81,13 @@ class Postie {
 
   async send(options) {
     if (!this.transporter) {
-      throw new Error('Transporter not configured. Please call setTransporter() first.')
+      throw new Error('Transporter not configured. Please call setTransporter() first.');
     }
 
     if (this.config.devMode) {
-      this.logger.info('Dev mode enabled - email not sent')
-      this.logger.debug('Email object:', options)
-      return { success: true, devMode: true, email: options }
+      this.logger.info('Dev mode enabled - email not sent');
+      this.logger.debug('Email object:', options);
+      return { success: true, devMode: true, email: options };
     }
 
     // Format email addresses
@@ -96,7 +95,7 @@ class Postie {
       from: typeof options.from === 'object' && options.from.email
         ? this.formatEmailAddress(options.from.email, options.from.name)
         : this.formatEmailAddress(options.from, options.fromName),
-      to: Array.isArray(options.to) 
+      to: Array.isArray(options.to)
         ? options.to.map(addr => typeof addr === 'string' ? addr : this.formatEmailAddress(addr.email, addr.name))
         : typeof options.to === 'object' && options.to.email
           ? this.formatEmailAddress(options.to.email, options.to.name)
@@ -115,7 +114,7 @@ class Postie {
       text: options.text,
       html: options.html,
       attachments: options.attachments,
-    }
+    };
 
     // Execute middleware chain
     let middlewareIndex = 0;
@@ -129,72 +128,72 @@ class Postie {
     // Start middleware chain
     await next();
 
-    let attempts = 0
-    let lastError = null
+    let attempts = 0;
+    let lastError = null;
 
     while (attempts < this.config.retryAttempts) {
       try {
-        const result = await this.transporter.sendMail(email)
-        this.logger.info(`Email sent successfully to ${email.to}`)
-        return { success: true, messageId: result.messageId }
+        const result = await this.transporter.sendMail(email);
+        this.logger.info(`Email sent successfully to ${email.to}`);
+        return { success: true, messageId: result.messageId };
       } catch (error) {
-        attempts++
-        lastError = error
-        this.logger.error(`Attempt ${attempts} failed: ${error.message}`)
-        
+        attempts++;
+        lastError = error;
+        this.logger.error(`Attempt ${attempts} failed: ${error.message}`);
+
         if (attempts === this.config.retryAttempts) {
-          throw lastError
+          throw lastError;
         }
-        
-        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay))
+
+        await new Promise(resolve => setTimeout(resolve, this.config.retryDelay));
       }
     }
   }
 
   async sendTemplate(options) {
     if (!options.template) {
-      throw new Error('Template not provided')
+      throw new Error('Template not provided');
     }
 
     if (!this.templateEngine) {
-      throw new Error('Template engine not configured')
+      throw new Error('Template engine not configured');
     }
 
-    let templateContent
+    let templateContent;
     // Check if template is a file path or template string
     if (fs.existsSync(options.template)) {
-      templateContent = fs.readFileSync(options.template, 'utf8')
+      templateContent = fs.readFileSync(options.template, 'utf8');
     } else {
-      templateContent = options.template
+      templateContent = options.template;
     }
 
-    let compiled
+    let compiled;
     if (this.templateEngine.compile) {
-      compiled = this.templateEngine.compile(templateContent)
+      compiled = this.templateEngine.compile(templateContent);
     } else {
-      compiled = templateContent
+      compiled = templateContent;
     }
 
-    const html = this.templateEngine.render(compiled, options.data || {})
+    const html = this.templateEngine.render(compiled, options.data || {});
 
     return this.send({
       ...options,
       html
-    })
+    });
   }
 
   notify(options) {
     return this.send({
       ...options,
       subject: `[NOTIFICATION] ${options.subject || 'New Notification'}`,
-    })
+    });
   }
 
   alert(options) {
     return this.send({
       ...options,
       subject: `[ALERT] ${options.subject || 'New Alert'}`,
-    })
+    });
   }
 
   ping(options) {
@@ -202,7 +201,7 @@ class Postie {
       ...options,
       subject: 'Ping',
       text: 'Ping!',
-    })
+    });
   }
 
   /**
@@ -213,16 +212,16 @@ class Postie {
    */
   define(name, config) {
     if (typeof name !== 'string') {
-      throw new Error('Event name must be a string')
+      throw new Error('Event name must be a string');
     }
 
     if (typeof config !== 'object' || config === null) {
-      throw new Error('Event configuration must be an object')
+      throw new Error('Event configuration must be an object');
     }
 
     // Store the event configuration
-    this.events.set(name, config)
-    return this
+    this.events.set(name, config);
+    return this;
   }
 
   /**
@@ -233,30 +232,31 @@ class Postie {
    */
   async trigger(name, overrides = {}) {
     if (!this.events.has(name)) {
-      throw new Error(`Event "${name}" is not defined`)
+      throw new Error(`Event "${name}" is not defined`);
     }
 
-    const eventConfig = this.events.get(name)
-    const mergedConfig = { ...eventConfig, ...overrides }
+    const eventConfig = this.events.get(name);
+    const mergedConfig = { ...eventConfig, ...overrides };
 
     // Handle different types of email sending based on the configuration
     if (mergedConfig.template) {
-      return this.sendTemplate(mergedConfig)
+      return this.sendTemplate(mergedConfig);
     } else if (mergedConfig.type) {
       switch (mergedConfig.type.toLowerCase()) {
-        case 'notify':
-          return this.notify(mergedConfig)
-        case 'alert':
-          return this.alert(mergedConfig)
-        case 'ping':
-          return this.ping(mergedConfig)
-        default:
-          return this.send(mergedConfig)
+      case 'notify':
+        return this.notify(mergedConfig);
+      case 'alert':
+        return this.alert(mergedConfig);
+      case 'ping':
+        return this.ping(mergedConfig);
+      default:
+        return this.send(mergedConfig);
       }
     } else {
-      return this.send(mergedConfig)
+      return this.send(mergedConfig);
     }
   }
 }
 
-module.exports = Postie 
+module.exports = Postie;
+module.exports.Postie = Postie;
