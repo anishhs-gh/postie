@@ -3,6 +3,7 @@
   "version": "1.0.3",
   "description": "A simple and powerful email sending library for Node.js with CLI support",
   "main": "src/index.js",
+  "types": "src/index.d.ts",
   "bin": {
     "postie": "src/cli.js"
   },
@@ -12,7 +13,9 @@
   "scripts": {
     "test": "jest",
     "lint": "eslint src/ tests/",
-    "example": "node examples/basic.js"
+    "example": "node examples/basic.js",
+    "build": "tsc",
+    "prepare": "npm run build"
   },
   "keywords": [
     "email",
@@ -36,8 +39,11 @@
     "nodemailer": "^6.9.9"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.14",
     "eslint": "^8.56.0",
-    "jest": "^29.7.0"
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.3.3"
   },
   "engines": {
     "node": ">=14.0.0"

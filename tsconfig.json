@@ -1,0 +1,9 @@
+{
+    "compilerOptions": {
+      "baseUrl": ".",
+      "paths": {
+        "@anishhs/postie": ["./src"]
+      }
+    }
+  }
+  
