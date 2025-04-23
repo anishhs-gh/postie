@@ -167,7 +167,7 @@ function saveConfig(config) {
 program
   .name('postie')
   .description('Postie email sending tool')
-  .version('1.0.4');
+  .version('1.0.5');
 
 // Configure command
 program
