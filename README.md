@@ -8,7 +8,7 @@
 - 📧 Email: [mail@anishhs.com](mailto:mail@anishhs.com) (for feedback and support)
 
 ## 📦 Version
-Current version: 1.0.4
+Current version: 1.0.5
 
 ## 📑 Table of Contents
 1. [Installation](#-installation)
@@ -48,37 +48,17 @@ import {
   PostieConfig,
   EmailOptions,
   AliasConfig,
+  TemplateEmailOptions,
   TemplateEngine,
   Middleware,
-  SendResult
+  SendResult,
+  EmailAddress,
+  EmailAttachment,
+  Logger
 } from '@anishhs/postie';
 
 // Create a Postie instance
 const postie = new Postie();
-```
-
-### Core Types
-
-```typescript
-// Email address can be a string or an object with name
-type EmailAddress = string | { email: string; name?: string };
-
-// Email attachment interface
-interface EmailAttachment {
-  filename?: string;
-  path?: string;
-  content?: string | Buffer;
-  contentType?: string;
-  encoding?: string;
-}
-
-// Email sending result
-interface SendResult {
-  success: boolean;
-  messageId?: string;
-  devMode?: boolean;
-  email?: EmailOptions;
-}
 ```
 
 ### SMTP Configuration
@@ -114,17 +94,33 @@ postie.configure(postieConfig);
 ### Sending Emails
 
 ```typescript
-// Basic email
+// Basic email with all available options
 const emailOptions: EmailOptions = {
   from: 'sender@example.com',
   fromName: 'Project Team',
   to: 'to@example.com',
+  toName: 'Recipient Name',
+  cc: 'cc@example.com',
+  ccName: 'CC Recipient',
+  bcc: 'bcc@example.com',
+  bccName: 'BCC Recipient',
   subject: 'Test Email',
   text: 'This is a test email',
-  html: '<p>This is a test email</p>'
+  html: '<p>This is a test email</p>',
+  attachments: [
+    {
+      filename: 'test.txt',
+      content: 'This is a test file content',
+      contentType: 'text/plain',
+      encoding: 'utf8'
+    }
+  ],
+  headers: {
+    'X-Custom-Header': 'value'
+  }
 };
 
-// Multiple recipients
+// Multiple recipients with different formats
 const multiRecipientEmail: EmailOptions = {
   from: 'sender@example.com',
   to: [
@@ -132,34 +128,36 @@ const multiRecipientEmail: EmailOptions = {
     { email: 'sender@example.com', name: 'Team Member' }
   ],
   cc: [
-    'sender@example.com',
-    { email: 'to@example.com', name: 'Project Manager' }
+    'cc@example.com',
+    { email: 'cc2@example.com', name: 'CC Recipient' }
+  ],
+  bcc: [
+    'bcc@example.com',
+    { email: 'bcc2@example.com', name: 'BCC Recipient' }
   ],
   subject: 'Multi-recipient Email',
   text: 'This email goes to multiple recipients'
 };
 
-// With attachments
-const emailWithAttachments: EmailOptions = {
+const result: SendResult = await postie.send(emailOptions);
+```
+
+### Template Emails
+
+```typescript
+// Template email with required fields
+const templateEmail: TemplateEmailOptions = {
   from: 'sender@example.com',
   to: 'to@example.com',
-  subject: 'Email with Attachments',
-  text: 'Please find the attached files',
-  attachments: [
-    {
-      filename: 'test.txt',
-      content: 'This is a test file content',
-      contentType: 'text/plain'
-    },
-    {
-      filename: 'document.pdf',
-      path: '/path/to/document.pdf',
-      contentType: 'application/pdf'
-    }
-  ]
+  subject: 'Welcome',
+  template: 'Hello {{name}}, welcome to {{company}}!',
+  data: {
+    name: 'John Doe',
+    company: 'Example Inc'
+  }
 };
 
-const result: SendResult = await postie.send(emailOptions);
+const templateResult: SendResult = await postie.sendTemplate(templateEmail);
 ```
 
 ### Template Engine
@@ -173,18 +171,6 @@ const templateEngine: TemplateEngine = {
 };
 
 postie.setTemplateEngine(templateEngine);
-
-// Send template email
-const templateResult: SendResult = await postie.sendTemplate({
-  from: 'sender@example.com',
-  to: 'to@example.com',
-  subject: 'Welcome',
-  template: 'Hello {{name}}, welcome to {{company}}!',
-  data: {
-    name: 'John Doe',
-    company: 'Example Inc'
-  }
-});
 ```
 
 ### Middleware
@@ -201,15 +187,33 @@ postie.use(logMiddleware);
 ### Aliases
 
 ```typescript
+// Define an alias with all available options
 const welcomeAlias: AliasConfig = {
   type: 'notify',
   from: 'sender@example.com',
   fromName: 'Project Team',
   to: 'to@example.com',
+  toName: 'Recipient Name',
+  cc: 'cc@example.com',
+  ccName: 'CC Recipient',
+  bcc: 'bcc@example.com',
+  bccName: 'BCC Recipient',
   subject: 'Welcome',
+  text: 'This is a welcome email',
+  html: '<p>This is a welcome email</p>',
   template: 'Hello {{name}}, welcome to {{company}}!',
   data: {
     company: 'Example Inc'
+  },
+  attachments: [
+    {
+      filename: 'welcome.pdf',
+      path: '/path/to/welcome.pdf',
+      contentType: 'application/pdf'
+    }
+  ],
+  headers: {
+    'X-Custom-Header': 'value'
   }
 };
 
@@ -227,23 +231,67 @@ const result: SendResult = await postie.trigger('welcome', {
 ### Special Email Types
 
 ```typescript
-// Notification
+// Notification with all available options
 const notificationResult: SendResult = await postie.notify({
+  from: 'sender@example.com',
+  fromName: 'System',
   to: 'to@example.com',
+  toName: 'Admin',
   subject: 'System Notification',
-  text: 'This is a notification'
+  text: 'This is a notification',
+  html: '<p>This is a notification</p>',
+  attachments: [
+    {
+      filename: 'log.txt',
+      content: 'System logs',
+      contentType: 'text/plain'
+    }
+  ],
+  headers: {
+    'X-Priority': '1'
+  }
 });
 
-// Alert
+// Alert with all available options
 const alertResult: SendResult = await postie.alert({
+  from: 'sender@example.com',
+  fromName: 'Monitoring',
   to: 'to@example.com',
+  toName: 'Admin',
   subject: 'System Alert',
-  text: 'This is an alert'
+  text: 'This is an alert',
+  html: '<p>This is an alert</p>',
+  attachments: [
+    {
+      filename: 'error.log',
+      content: 'Error logs',
+      contentType: 'text/plain'
+    }
+  ],
+  headers: {
+    'X-Priority': '1'
+  }
 });
 
-// Ping
+// Ping with all available options
 const pingResult: SendResult = await postie.ping({
-  to: 'to@example.com'
+  from: 'sender@example.com',
+  fromName: 'System',
+  to: 'to@example.com',
+  toName: 'Admin',
+  subject: 'Ping Test',
+  text: 'Ping!',
+  html: '<p>Ping!</p>',
+  attachments: [
+    {
+      filename: 'ping.log',
+      content: 'Ping logs',
+      contentType: 'text/plain'
+    }
+  ],
+  headers: {
+    'X-Priority': '1'
+  }
 });
 ```
 

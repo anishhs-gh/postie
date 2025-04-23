@@ -6,7 +6,8 @@ import {
   AliasConfig,
   TemplateEngine,
   Middleware,
-  SendResult
+  SendResult,
+  TemplateEmailOptions
 } from '@anishhs/postie';
 import * as path from 'path';
 
@@ -145,7 +146,7 @@ async function sendEmailWithAttachments(): Promise<SendResult> {
 // Send template email
 async function sendTemplateEmail(): Promise<SendResult> {
   try {
-    const result = await postie.sendTemplate({
+    const templateEmailOptions: TemplateEmailOptions = {
       from: 'sender@example.com',
       fromName: 'Project Team',
       to: 'to@example.com',
@@ -155,7 +156,9 @@ async function sendTemplateEmail(): Promise<SendResult> {
         name: 'Anish',
         company: 'Postie'
       }
-    });
+    }
+
+    const result = await postie.sendTemplate(templateEmailOptions);
     console.log('Template email sent:', result);
     return result;
   } catch (error) {
@@ -202,12 +205,13 @@ async function testAlias(): Promise<SendResult> {
 // Send a notification
 async function sendNotification(): Promise<SendResult> {
   try {
-    const result = await postie.notify({
+    const notifyOptions: EmailOptions = {
       to: 'to@example.com',
       subject: 'System Notification',
       text: 'This is a system notification',
       html: '<p>This is a system notification</p>'
-    });
+    }
+    const result = await postie.notify(notifyOptions);
     console.log('Notification sent:', result);
     return result;
   } catch (error) {

@@ -36,6 +36,15 @@ export interface EmailOptions {
 }
 
 /**
+ * Configuration for defining an email alias.
+ */
+export interface AliasConfig extends EmailOptions {
+  type?: 'notify' | 'alert' | 'ping';
+  template?: string;
+  data?: Record<string, any>;
+}
+
+/**
  * Result of an attempted email send.
  */
 export interface SendResult {
@@ -94,12 +103,11 @@ export interface Middleware {
 }
 
 /**
- * Extended configuration used for defining an alias.
+ * Options for sending a template email.
  */
-export interface AliasConfig extends EmailOptions {
-  type?: 'notify' | 'alert' | 'ping';
-  template?: string;
-  data?: Record<string, any>;
+export interface TemplateEmailOptions extends EmailOptions {
+  template: string;
+  data: Record<string, any>;
 }
 
 /**
@@ -124,7 +132,7 @@ export class Postie {
 
   ping(options: EmailOptions): Promise<SendResult>;
 
-  sendTemplate(options: EmailOptions & { template: string; data: Record<string, any> }): Promise<SendResult>;
+  sendTemplate(options: TemplateEmailOptions): Promise<SendResult>;
 
   use(middleware: Middleware): this;
 
@@ -132,7 +140,7 @@ export class Postie {
 
   trigger(
     name: string,
-    overrides?: Partial<EmailOptions> & { data?: Record<string, any> }
+    overrides?: Partial<AliasConfig>
   ): Promise<SendResult>;
 
   formatEmailAddress(email: string, name?: string): string;
